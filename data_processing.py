@@ -1,22 +1,23 @@
-import math
 from PIL import Image
 import numpy as np
-
+from scipy.special import expit
 
 # YOLOv3-608 has been trained with these 80 categories from COCO:
 # Lin, Tsung-Yi, et al. "Microsoft COCO: Common Objects in Context."
 # European Conference on Computer Vision. Springer, Cham, 2014.
 
+
 def load_label_categories(label_file_path):
     categories = [line.rstrip('\n') for line in open(label_file_path)]
     return categories
 
-LABEL_FILE_PATH = 'coco_labels.txt'
+
+LABEL_FILE_PATH = './names/object.names'
 ALL_CATEGORIES = load_label_categories(LABEL_FILE_PATH)
 
 # Let's make sure that there are 80 classes, as expected for the COCO data set:
 CATEGORY_NUM = len(ALL_CATEGORIES)
-assert CATEGORY_NUM == 80
+assert CATEGORY_NUM == 9
 
 
 class PreprocessYOLO(object):
@@ -54,7 +55,8 @@ class PreprocessYOLO(object):
         input_image_path -- string path of the image to be loaded
         """
 
-        image_raw = Image.open(input_image_path)
+        #image_raw = Image.open(input_image_path)
+        image_raw = input_image_path
         # Expecting yolo_input_resolution in (height, width) format, adjusting to PIL
         # convention (width, height) in PIL:
         new_resolution = (
@@ -207,33 +209,18 @@ class PostprocessYOLO(object):
         output_reshaped -- reshaped YOLO output as NumPy arrays with shape (height,width,3,85)
         mask -- 2-dimensional tuple with mask specification for this output
         """
-
-        # Two in-line functions required for calculating the bounding box
-        # descriptors:
-        def sigmoid(value):
-            """Return the sigmoid of the input."""
-            return 1.0 / (1.0 + math.exp(-value))
-
-        def exponential(value):
-            """Return the exponential of the input."""
-            return math.exp(value)
-
-        # Vectorized calculation of above two functions:
-        sigmoid_v = np.vectorize(sigmoid)
-        exponential_v = np.vectorize(exponential)
-
         grid_h, grid_w, _, _ = output_reshaped.shape
 
         anchors = [self.anchors[i] for i in mask]
 
         # Reshape to N, height, width, num_anchors, box_params:
         anchors_tensor = np.reshape(anchors, [1, 1, len(anchors), 2])
-        box_xy = sigmoid_v(output_reshaped[..., :2])
-        box_wh = exponential_v(output_reshaped[..., 2:4]) * anchors_tensor
-        box_confidence = sigmoid_v(output_reshaped[..., 4])
+        box_xy = expit(output_reshaped[..., :2])
+        box_wh = np.exp(output_reshaped[..., 2:4]) * anchors_tensor
+        box_confidence = expit(output_reshaped[..., 4])
 
         box_confidence = np.expand_dims(box_confidence, axis=-1)
-        box_class_probs = sigmoid_v(output_reshaped[..., 5:])
+        box_class_probs = expit(output_reshaped[..., 5:])
 
         col = np.tile(np.arange(0, grid_w), grid_w).reshape(-1, grid_w)
         row = np.tile(np.arange(0, grid_h).reshape(-1, 1), grid_h)
