@@ -8,7 +8,7 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 from PIL import ImageDraw
 
-from yolov3_to_onnx import download_file
+#from yolov3_to_onnx import download_file
 from data_processing import PreprocessYOLO, PostprocessYOLO, ALL_CATEGORIES
 
 import sys, os
